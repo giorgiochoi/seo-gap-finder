@@ -151,18 +151,29 @@ if st.session_state.report_ready:
         submit_lead = st.form_submit_button("Send Full PDF Strategy")
         
         if submit_lead:
-            if "@" not in email_input or "." not in email_input:
-                st.error("Please enter a valid email address.")
+            if "@" not in email_input:
+                st.error("Invalid email.")
             else:
-                # Format the report into safe HTML for the Webhook
-                html_report = markdown_to_safe_html(st.session_state.report_content)
+                # 1. SPLIT THE CONTENT
+                # We assume Gemini uses '---' to separate sections
+                parts = st.session_state.report_content.split("---")
                 
+                # Tease: Strategic Context + Gaps
+                email_tease = parts[0] + (parts[1] if len(parts) > 1 else "")
+                # Full: Everything
+                full_blueprint = st.session_state.report_content
+        
+                # 2. PREP PAYLOAD
                 payload = {
-                    "email": email_input, 
-                    "url": st.session_state.current_url, 
+                    "email": email_input,
                     "keyword": st.session_state.current_keyword,
-                    "summary": html_report 
+                    "url": st.session_state.current_url,
+                    "email_body": markdown_to_safe_html(email_tease),
+                    "pdf_body": markdown_to_safe_html(full_blueprint)
                 }
+        # 3. SEND TO MAKE
+        requests.post(WEBHOOK_URL, json=payload)
+        st.success("The teaser is in your inbox; the full blueprint is attached!")
                 
                 try:
                     # Final safety check on URL
