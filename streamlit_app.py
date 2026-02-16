@@ -15,7 +15,7 @@ serper_key = st.secrets.get("SERPER_API_KEY")
 
 # MAKE.COM CONFIG
 # Replace the string below with your actual Webhook URL from Make.com
-WEBHOOK_URL = "https://hook.us2.make.com/your_unique_webhook_id" 
+WEBHOOK_URL = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia" 
 
 if not all([gemini_key, firecrawl_key, serper_key]):
     st.error("Missing API keys in Streamlit Secrets. Please check your .streamlit/secrets.toml or Streamlit Cloud settings.")
