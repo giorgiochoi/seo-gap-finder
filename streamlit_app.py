@@ -114,23 +114,23 @@ if st.session_state.report_ready:
     
     st.divider()
     with st.form("lead_capture", clear_on_submit=True): # clear_on_submit helps prevent double-firing
-    st.subheader("📬 Get the Full Strategy PDF")
-    email = st.text_input("Email Address")
-    submit_lead = st.form_submit_button("Send Me the Report")
-    
-    if submit_lead:
-        if "@" not in email:
-            st.error("Please enter a valid email.")
-        else:
-            # CHECK: Only send if we actually have a report in state
-            if st.session_state.get("report_content"):
-                webhook_url = "your_webhook_url"
-                payload = {
-                    "email": email,
-                    "url": st.session_state.current_url,
-                    "keyword": st.session_state.current_keyword,
-                    "summary": st.session_state.report_content
-                }
-                requests.post(webhook_url, json=payload)
-                st.success("Report is on its way!")
-                st.balloons()
+        st.subheader("📬 Get the Full Strategy PDF")
+        email = st.text_input("Email Address")
+        submit_lead = st.form_submit_button("Send Me the Report")
+        
+        if submit_lead:
+            if "@" not in email:
+                st.error("Please enter a valid email.")
+            else:
+                # CHECK: Only send if we actually have a report in state
+                if st.session_state.get("report_content"):
+                    webhook_url = "your_webhook_url"
+                    payload = {
+                        "email": email,
+                        "url": st.session_state.current_url,
+                        "keyword": st.session_state.current_keyword,
+                        "summary": st.session_state.report_content
+                    }
+                    requests.post(webhook_url, json=payload)
+                    st.success("Report is on its way!")
+                    st.balloons()
