@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import os
-from firecrawl import Firecrawl
+from firecrawl import FirecrawlApp  # Updated for SDK v2.0+
 from langchain_anthropic import ChatAnthropic
 
 # --- 1. SETUP & CONFIG ---
@@ -16,8 +16,9 @@ if not all([anthropic_key, firecrawl_key, serper_key]):
     st.error("Missing API keys. Please check your Streamlit Secrets.")
     st.stop()
 
-# Initialize SDKs (Using modern Firecrawl class)
-firecrawl = Firecrawl(api_key=firecrawl_key)
+# Initialize SDKs
+# Note: FirecrawlApp is the modern standard for the v2 SDK
+firecrawl = FirecrawlApp(api_key=firecrawl_key)
 model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
 
 # --- 2. STATE MANAGEMENT ---
@@ -56,23 +57,23 @@ if run_btn:
                     st.error("No search results found. Check your Serper API key or keyword.")
                     st.stop()
                 
-                # Clean the competitor URL (removes tracking parameters)
+                # Clean the competitor URL
                 comp_url = search_data['organic'][0]['link'].split('?')[0]
                 st.info(f"Targeting Competitor: {comp_url}")
 
-                # STEP 2: Scrape both sites (Updated to latest Firecrawl SDK)
+                # STEP 2: Scrape both sites (Updated for SDK v2.0+ parameters)
                 with st.spinner("📄 Scraping content..."):
-                    # The latest SDK uses .scrape() and returns a Document object
-                    user_scrape = firecrawl.scrape(user_url, params={'formats': ['markdown']})
-                    comp_scrape = firecrawl.scrape(comp_url, params={'formats': ['markdown']})
+                    # In v2.0+, parameters like 'formats' are passed directly, NOT inside a 'params' dict
+                    user_scrape = firecrawl.scrape_url(user_url, formats=['markdown'])
+                    comp_scrape = firecrawl.scrape_url(comp_url, formats=['markdown'])
                     
-                    # Access the markdown content from the document object
+                    # Extract markdown safely from the response object/dict
                     user_markdown = user_scrape.get('markdown', '') if isinstance(user_scrape, dict) else getattr(user_scrape, 'markdown', '')
                     comp_markdown = comp_scrape.get('markdown', '') if isinstance(comp_scrape, dict) else getattr(comp_scrape, 'markdown', '')
 
                 # STEP 3: AI Gap Analysis
                 if not user_markdown or not comp_markdown:
-                    st.error("Could not extract enough content to analyze. One of the sites may be blocking the scraper.")
+                    st.error("Could not extract enough content. The site might be blocking the scraper.")
                     st.stop()
 
                 with st.spinner("🤖 Claude is analyzing the gap..."):
@@ -118,4 +119,4 @@ if st.session_state.report_ready:
                 }
                 requests.post(webhook_url, json=payload)
                 st.balloons()
-                st.success("Success! Your full strategy will arrive in your inbox shortly.")
+                st.success("Success! Check your inbox soon.")
