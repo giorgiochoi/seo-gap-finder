@@ -1,25 +1,31 @@
 import streamlit as st
 import requests
 import os
-from firecrawl import Firecrawl # Ensure this is the new class name
+from firecrawl import Firecrawl 
 from langchain_anthropic import ChatAnthropic
 
 # 1. Setup Page Config
 st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
 st.title("🔍 SEO Content Gap Finder")
+st.write("Enter your URL and a keyword to find exactly what your competitors are doing better.")
 
-# 2. GET KEYS FIRST (Crucial: Must happen before step 3)
+# 2. GET KEYS FIRST (Corrected Order)
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
 
-# Debugging Info
+# 3. DEBUGGING & VALIDATION
 if firecrawl_key:
     st.info(f"Firecrawl Key detected: {firecrawl_key[:5]}...") 
 else:
     st.error("Firecrawl Key NOT found in secrets!")
     st.stop()
 
-# 3. Initialize Engines (Now firecrawl_key is defined)
+if not anthropic_key:
+    st.error("Anthropic Key NOT found in secrets!")
+    st.stop()
+
+# 4. INITIALIZE ENGINES
+# We do this once, correctly, using the modern 'Firecrawl' class
 try:
     firecrawl = Firecrawl(api_key=firecrawl_key)
     model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
@@ -27,23 +33,13 @@ except Exception as e:
     st.error(f"Failed to initialize engines: {e}")
     st.stop()
 
-# ... rest of your session state and form code goes here ...
-
-if not anthropic_key or not firecrawl_key:
-    st.error("API Keys missing! Please add them to your Streamlit Secrets.")
-    st.stop()
-
-# 4. Initialize Engines
-firecrawl = FirecrawlApp(api_key=firecrawl_key)
-model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
-
-# Initialize session state to keep the report visible after lead capture
+# 5. SESSION STATE
 if "report_ready" not in st.session_state:
     st.session_state.report_ready = False
 if "report_content" not in st.session_state:
     st.session_state.report_content = ""
 
-# 4. The Main Audit Form
+# 6. THE MAIN AUDIT FORM
 with st.form("audit_form"):
     user_url = st.text_input("Your Website URL", placeholder="https://mywebsite.com")
     target_keyword = st.text_input("Target Keyword", placeholder="best wireless headphones")
@@ -56,16 +52,13 @@ if submit:
         with st.spinner("🕵️ Agent is crawling the web..."):
             try:
                 # Step 1: Search for the top competitor
-                # We removed the params={} part and passed limit directly
                 search_results = firecrawl.search(target_keyword, limit=1)
                 
-                # Ensure we actually got a result back
                 if search_results and len(search_results) > 0:
                     comp_url = search_results[0]['url']
                 else:
                     st.error("No search results found for that keyword.")
                     st.stop()
-                comp_url = search_results[0]['url']
                 
                 # Step 2: Scrape both sites
                 st.write(f"Analyzing your site vs. **{comp_url}**")
@@ -94,9 +87,9 @@ if submit:
                 st.session_state.current_keyword = target_keyword
                 
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.error(f"An error occurred during analysis: {e}")
 
-# 5. Display Report and Lead Capture
+# 7. DISPLAY REPORT AND LEAD CAPTURE
 if st.session_state.report_ready:
     st.success("Analysis Complete!")
     st.markdown("### 📊 The Gap Report")
@@ -104,9 +97,8 @@ if st.session_state.report_ready:
     
     st.markdown("---")
     st.subheader("📬 Want the Full 10-Page Content Blueprint?")
-    st.write("The AI has identified the gaps. Enter your email to receive the complete step-by-step execution plan in your inbox.")
+    st.write("Enter your email to receive the complete step-by-step execution plan.")
     
-    # Lead Capture Form
     with st.form("lead_capture"):
         email = st.text_input("Email Address")
         lead_submit = st.form_submit_button("Send Me the Full Report")
@@ -118,16 +110,16 @@ if st.session_state.report_ready:
                     "email": email,
                     "url": st.session_state.current_url,
                     "keyword": st.session_state.current_keyword,
-                    "summary": st.session_state.report_content[:1000] # Sending summary to Make
+                    "summary": st.session_state.report_content[:1000]
                 }
                 
                 try:
                     res = requests.post(webhook_url, json=payload)
                     if res.status_code == 200:
                         st.balloons()
-                        st.success("Success! Your full report is being generated and will arrive in your inbox shortly.")
+                        st.success("Success! Your report is on the way.")
                     else:
-                        st.error("Connection error. Please try again later.")
+                        st.error("Webhook error. Please try again.")
                 except Exception as e:
                     st.error(f"Failed to send lead: {e}")
             else:
