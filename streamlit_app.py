@@ -146,7 +146,7 @@ if st.session_state.report_ready:
                     res = requests.post(WEBHOOK_URL, json=payload)
                     if res.status_code == 200:
                         st.balloons()
-                        st.success(f"Success! Teaser sent to {email_input}. Full PDF attached.")
+                        st.success(f"Success! Teaser sent to {email_input} with a full PDF attached. Check your spam folder—sometimes the AI gets too excited!")
                     else:
                         st.error(f"Make.com Error: {res.status_code}")
                 except Exception as e:
