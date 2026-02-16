@@ -1,27 +1,33 @@
 import streamlit as st
 import requests
 import os
-# 3. Initialize Engines
-from firecrawl import Firecrawl # Update the import at the top too!
-
-firecrawl = Firecrawl(api_key=firecrawl_key) 
-model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
+from firecrawl import Firecrawl # Ensure this is the new class name
 from langchain_anthropic import ChatAnthropic
 
 # 1. Setup Page Config
 st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
 st.title("🔍 SEO Content Gap Finder")
 
-# 2. GET KEYS FIRST (Moved up)
+# 2. GET KEYS FIRST (Crucial: Must happen before step 3)
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
 
-# Check if keys are loaded for debugging
+# Debugging Info
 if firecrawl_key:
-    # This will show the first 5 characters only for safety
     st.info(f"Firecrawl Key detected: {firecrawl_key[:5]}...") 
 else:
     st.error("Firecrawl Key NOT found in secrets!")
+    st.stop()
+
+# 3. Initialize Engines (Now firecrawl_key is defined)
+try:
+    firecrawl = Firecrawl(api_key=firecrawl_key)
+    model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
+except Exception as e:
+    st.error(f"Failed to initialize engines: {e}")
+    st.stop()
+
+# ... rest of your session state and form code goes here ...
 
 if not anthropic_key or not firecrawl_key:
     st.error("API Keys missing! Please add them to your Streamlit Secrets.")
