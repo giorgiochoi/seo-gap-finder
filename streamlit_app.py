@@ -4,21 +4,25 @@ import os
 from firecrawl import FirecrawlApp
 from langchain_anthropic import ChatAnthropic
 
-# 1. Setup Page Config
-st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
-st.title("🔍 SEO Content Gap Finder")
-st.write("Enter your URL and a keyword to find exactly what your competitors are doing better.")
-st.write(f"Firecrawl Key loaded? {'Yes' if firecrawl_key and firecrawl_key.startswith('fc-') else 'No'}")
-
-# 2. Get API Keys
+# --- NEW ORDER: LOAD SECRETS FIRST ---
+# This defines the variables so the rest of the app knows they exist.
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
 
+# 1. Setup Page Config
+st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
+st.title("🔍 SEO Content Gap Finder")
+
+# 2. DEBUG LINE (Optional - delete this once you see "Yes")
+# Now this won't cause a NameError because firecrawl_key is defined above!
+st.write(f"Firecrawl Key loaded? {'Yes' if firecrawl_key and firecrawl_key.startswith('fc-') else 'No'}")
+
+# 3. Check if keys exist
 if not anthropic_key or not firecrawl_key:
     st.error("API Keys missing! Please add them to your Streamlit Secrets.")
     st.stop()
 
-# 3. Initialize Engines
+# 4. Initialize Engines
 firecrawl = FirecrawlApp(api_key=firecrawl_key)
 model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
 
