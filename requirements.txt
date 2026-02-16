@@ -1,4 +1,4 @@
 streamlit
 requests
 firecrawl-py
-langchain-anthropic
+google-genai
