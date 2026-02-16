@@ -124,9 +124,13 @@ if st.session_state.report_ready:
             else:
                 webhook_url = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia"
                 payload = {
-                    "email": email, 
-                    "url": st.session_state.current_url, 
-                    "keyword": st.session_state.current_keyword
+                    payload = {
+                        "email": email,
+                        "url": st.session_state.current_url,
+                        "keyword": st.session_state.current_keyword,
+                        "summary": st.session_state.report_content  # <--- MAKE SURE THIS IS HERE
+                    }
+                    res = requests.post(webhook_url, json=payload)
                 }
                 requests.post(webhook_url, json=payload)
                 st.balloons()
