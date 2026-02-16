@@ -40,7 +40,15 @@ if submit:
         with st.spinner("🕵️ Agent is crawling the web..."):
             try:
                 # Step 1: Search for the top competitor
-                search_results = firecrawl.search(target_keyword, params={'limit': 1})
+                # We removed the params={} part and passed limit directly
+                search_results = firecrawl.search(target_keyword, limit=1)
+                
+                # Ensure we actually got a result back
+                if search_results and len(search_results) > 0:
+                    comp_url = search_results[0]['url']
+                else:
+                    st.error("No search results found for that keyword.")
+                    st.stop()
                 comp_url = search_results[0]['url']
                 
                 # Step 2: Scrape both sites
