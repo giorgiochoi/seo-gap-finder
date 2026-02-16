@@ -32,36 +32,26 @@ with st.sidebar:
     run_btn = st.button("Run Analysis", use_container_width=True)
 
 # --- 4. CORE LOGIC ---
-if run_btn:
-    if not user_url or not target_keyword:
-        st.warning("Please provide both a URL and a keyword.")
-    else:
+with st.spinner("♊ Gemini is analyzing..."):
+    # Try the most stable 2026 models in order
+    available_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+    success = False
+    
+    for model_id in available_models:
         try:
-            # STEP 1: Search
-            headers = {'X-API-KEY': serper_key, 'Content-Type': 'application/json'}
-            search_res = requests.post('https://google.serper.dev/search', json={"q": target_keyword, "num": 1}, headers=headers)
-            comp_url = search_res.json()['organic'][0]['link'].split('?')[0]
-            st.info(f"Targeting Competitor: {comp_url}")
-
-            # STEP 2: Scrape
-            with st.spinner("📄 Scraping sites..."):
-                user_data = firecrawl.scrape(user_url, formats=['markdown'])
-                comp_data = firecrawl.scrape(comp_url, formats=['markdown'])
-                u_md = getattr(user_data, 'markdown', "")[:8000]
-                c_md = getattr(comp_data, 'markdown', "")[:8000]
-
-            # STEP 3: Gemini Analysis
-            with st.spinner("♊ Gemini is analyzing..."):
-                prompt = f"Compare {user_url} vs {comp_url} for '{target_keyword}'. Provide 3 missed topics and a 200-word plan.\n\nUSER: {u_md}\n\nCOMP: {c_md}"
-                response = client.models.generate_content(model='gemini-1.5-flash-latest', contents=prompt)
-                
-                st.session_state.report_content = response.text
-                st.session_state.report_ready = True
-                st.session_state.current_url = user_url
-                st.session_state.current_keyword = target_keyword
+            response = client.models.generate_content(
+                model=model_id,
+                contents=prompt
+            )
+            st.session_state.report_content = response.text
+            st.session_state.report_ready = True
+            success = True
+            break # Stop if we get a response
         except Exception as e:
-            st.error(f"Error: {e}")
-
+            continue # Try the next model if this one 404s
+            
+    if not success:
+        st.error("All Gemini models returned a 404. Please check if the 'Generative Language API' is enabled in your Google Cloud Console.")
 # --- 5. DISPLAY ---
 if st.session_state.report_ready:
     st.divider()
