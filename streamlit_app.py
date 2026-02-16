@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import requests
 import re
@@ -71,18 +72,28 @@ if run_btn:
                 u_md = getattr(user_scrape, 'markdown', "")[:8000]
                 c_md = getattr(comp_scrape, 'markdown', "")[:8000]
 
-            # STEP 3: Gemini Analysis
-            with st.spinner("♊ Gemini is analyzing..."):
+            # STEP 3: Gemini Analysis with Retry Logic
+            with st.spinner("♊ Gemini is busy but working..."):
                 prompt = f"Compare {user_url} vs {comp_url} for '{target_keyword}'. Output 3 gaps and a plan. Use markdown."
-                response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
                 
-                st.session_state.report_content = response.text
-                st.session_state.report_ready = True
-                st.session_state.current_url = user_url
-                st.session_state.current_keyword = target_keyword
-
-        except Exception as e:
-            st.error(f"Analysis failed: {e}")
+                # Retry loop
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = client.models.generate_content(
+                            model='gemini-3-flash-preview', 
+                            contents=prompt
+                        )
+                        st.session_state.report_content = response.text
+                        st.session_state.report_ready = True
+                        break # Success! Exit the loop
+                    except Exception as e:
+                        if "503" in str(e) and attempt < max_retries - 1:
+                            wait_time = (attempt + 1) * 2 # Wait 2s, then 4s
+                            st.warning(f"Server busy. Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                        else:
+                            raise e # If it's not a 503 or we're out of retries, show error
 
 # --- 6. DISPLAY & LEAD CAPTURE ---
 if st.session_state.report_ready:
