@@ -54,7 +54,11 @@ if submit:
                 # Step 1: Search for the top competitor
                 search_results = firecrawl.search(target_keyword, limit=1)
                 
-                if search_results and len(search_results) > 0:
+                # Check if 'data' exists in the results object
+                if search_results and hasattr(search_results, 'data') and len(search_results.data) > 0:
+                    comp_url = search_results.data[0]['url']
+                elif isinstance(search_results, list) and len(search_results) > 0:
+                    # Fallback for older versions that return a list
                     comp_url = search_results[0]['url']
                 else:
                     st.error("No search results found for that keyword.")
