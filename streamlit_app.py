@@ -60,13 +60,15 @@ if run_btn:
                 comp_url = search_data['organic'][0]['link'].split('?')[0]
                 st.session_state.current_comp = comp_url
 
-            # STEP 2: Scrape
+           # STEP 2: Scrape both sites
             with st.spinner("📄 Scraping content..."):
-                user_scrape = firecrawl.scrape_url(user_url, params={'formats': ['markdown']})
-                comp_scrape = firecrawl.scrape_url(comp_url, params={'formats': ['markdown']})
+                # Updated to the latest Firecrawl SDK syntax
+                user_scrape = firecrawl.scrape(user_url, formats=['markdown'])
+                comp_scrape = firecrawl.scrape(comp_url, formats=['markdown'])
                 
-                u_md = user_scrape.get('markdown', "")[:8000]
-                c_md = comp_scrape.get('markdown', "")[:8000]
+                # Extract markdown, providing an empty string if it fails
+                u_md = getattr(user_scrape, 'markdown', "")[:8000]
+                c_md = getattr(comp_scrape, 'markdown', "")[:8000]
 
             # STEP 3: Gemini Analysis
             with st.spinner("♊ Gemini 3 is analyzing..."):
