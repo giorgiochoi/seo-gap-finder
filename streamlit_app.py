@@ -1,7 +1,12 @@
 import streamlit as st
 import requests
 import os
-from firecrawl import FirecrawlApp
+# 3. Initialize Engines
+from firecrawl import Firecrawl # Update the import at the top too!
+
+# Use the new class name 'Firecrawl'
+firecrawl = Firecrawl(api_key=firecrawl_key) 
+model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
 from langchain_anthropic import ChatAnthropic
 
 # 1. Setup Page Config
