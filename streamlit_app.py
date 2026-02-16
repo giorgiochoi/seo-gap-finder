@@ -120,17 +120,31 @@ if st.session_state.report_ready:
         
         if submit_lead:
             if "@" not in email:
-                st.error("Please enter a valid email.")
+                st.error("Invalid email.")
             else:
-                # CHECK: Only send if we actually have a report in state
-                if st.session_state.get("report_content"):
-                    webhook_url = "your_webhook_url"
-                    payload = {
-                        "email": email,
-                        "url": st.session_state.current_url,
-                        "keyword": st.session_state.current_keyword,
-                        "summary": st.session_state.report_content
-                    }
-                    requests.post(webhook_url, json=payload)
-                    st.success("Report is on its way!")
-                    st.balloons()
+                # 1. Get the content
+                raw_summary = st.session_state.get("report_content", "")
+                
+                # 2. Simple 'Markdown to HTML' converter for bolding and headers
+                # This fixes the **apple** -> <b>apple</b> issue
+                html_summary = raw_summary.replace("**", "<b>").replace("### ", "<h3>").replace("## ", "<h2>")
+                # Note: This is a basic fix; for full conversion, we just need the tags Google Docs likes.
+        
+                webhook_url = "https://hook.us2.make.com/YOUR_ID_HERE" # Double check the HTTPS!
+                
+                payload = {
+                    "email": email, 
+                    "url": st.session_state.get("current_url", user_url), 
+                    "keyword": st.session_state.get("current_keyword", target_keyword),
+                    "summary": html_summary # Send the cleaned HTML version
+                }
+                
+                try:
+                    res = requests.post(webhook_url, json=payload)
+                    if res.status_code == 200:
+                        st.success("Strategy sent! Check your inbox.")
+                        st.balloons()
+                    else:
+                        st.error(f"Error: {res.status_code}")
+                except Exception as e:
+                    st.error(f"Link broken: {e}")
