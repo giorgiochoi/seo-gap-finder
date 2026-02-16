@@ -113,23 +113,24 @@ if st.session_state.report_ready:
     st.markdown(st.session_state.report_content)
     
     st.divider()
-    with st.form("lead_capture"):
-        st.subheader("📬 Get the Full Strategy PDF")
-        email = st.text_input("Email Address")
-        submit_lead = st.form_submit_button("Send Me the Report")
-        
-        if submit_lead:
-            if "@" not in email:
-                st.error("Invalid email.")
-            else:
-                webhook_url = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia"
+    with st.form("lead_capture", clear_on_submit=True): # clear_on_submit helps prevent double-firing
+    st.subheader("📬 Get the Full Strategy PDF")
+    email = st.text_input("Email Address")
+    submit_lead = st.form_submit_button("Send Me the Report")
+    
+    if submit_lead:
+        if "@" not in email:
+            st.error("Please enter a valid email.")
+        else:
+            # CHECK: Only send if we actually have a report in state
+            if st.session_state.get("report_content"):
+                webhook_url = "your_webhook_url"
                 payload = {
                     "email": email,
                     "url": st.session_state.current_url,
                     "keyword": st.session_state.current_keyword,
-                    "summary": st.session_state.report_content  # <--- MAKE SURE THIS IS HERE
+                    "summary": st.session_state.report_content
                 }
-                res = requests.post(webhook_url, json=payload)
                 requests.post(webhook_url, json=payload)
+                st.success("Report is on its way!")
                 st.balloons()
-                st.success("Success! Check your inbox.")
