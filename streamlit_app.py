@@ -29,19 +29,20 @@ client = genai.Client(api_key=gemini_key, http_options={'api_version': 'v1beta'}
 # --- 2. FORMATTING HELPER ---
 def markdown_to_safe_html(text):
     """
-    Converts basic markdown to closed HTML tags.
-    This prevents the 'growing text' bug in email clients and Google Docs.
+    Converts markdown to standard HTML tags that Google Docs 
+    and Email clients both understand easily.
     """
-    # 1. Handle Headers (### Header)
+    # 1. Handle Headers (### Header) -> <h3>Header</h3>
     text = re.sub(r'### (.*?)\n', r'<h3>\1</h3>', text)
-    # 2. Handle Bold (**Text**)
+    # 2. Handle Bold (**Text**) -> <b>Text</b>
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # 3. Handle Lists (* Item)
-    text = re.sub(r'\* (.*?)\n', r'<li>\1</li>', text)
-    # 4. Convert remaining newlines to breaks
-    text = text.replace('\n', '<br>')
-    # 5. Wrap in a reset div
-    return f"<div style='font-size:14px; font-family:sans-serif; line-height:1.6; color:#333;'>{text}</div>"
+    # 3. Handle Lists (* Item) -> <li>Item</li>
+    # We wrap them in <ul> for proper bullet formatting
+    text = re.sub(r'\* (.*?)\n', r'<ul><li>\1</li></ul>', text)
+    # 4. Convert newlines to standard paragraph breaks
+    text = text.replace('\n', '<p></p>')
+    
+    return text
 
 # --- 3. STATE MANAGEMENT ---
 if "report_ready" not in st.session_state:
