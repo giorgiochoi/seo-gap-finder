@@ -174,17 +174,16 @@ if st.session_state.report_ready:
         # 3. SEND TO MAKE
         requests.post(WEBHOOK_URL, json=payload)
         st.success("The teaser is in your inbox; the full blueprint is attached!")
-                
-                try:
-                    # Final safety check on URL
-                    if not WEBHOOK_URL.startswith("http"):
-                        st.error("Invalid Webhook URL. Please check your script configuration.")
+            try:
+                # Final safety check on URL
+                if not WEBHOOK_URL.startswith("http"):
+                    st.error("Invalid Webhook URL. Please check your script configuration.")
+                else:
+                    response = requests.post(WEBHOOK_URL, json=payload)
+                    if response.status_code == 200:
+                        st.balloons()
+                        st.success(f"Success! The PDF is being generated and sent to {email_input}")
                     else:
-                        response = requests.post(WEBHOOK_URL, json=payload)
-                        if response.status_code == 200:
-                            st.balloons()
-                            st.success(f"Success! The PDF is being generated and sent to {email_input}")
-                        else:
-                            st.error(f"Delivery Service Error (Make.com): {response.status_code}")
-                except Exception as e:
-                    st.error(f"Could not connect to Delivery Service: {e}")
+                        st.error(f"Delivery Service Error (Make.com): {response.status_code}")
+            except Exception as e:
+                st.error(f"Could not connect to Delivery Service: {e}")
