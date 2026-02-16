@@ -3,6 +3,15 @@ import requests
 import os
 from firecrawl import Firecrawl # Modern v2 SDK
 from langchain_anthropic import ChatAnthropic
+import google.generativeai as genai
+
+# Setup Gemini
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash') # Use Flash for speed & free tier
+
+# In your logic section, replace model.invoke with:
+response = model.generate_content(prompt)
+st.session_state.report_content = response.text
 
 # --- 1. SETUP ---
 st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
