@@ -18,35 +18,27 @@ serper_key = st.secrets.get("SERPER_API_KEY")
 WEBHOOK_URL = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia" 
 
 if not all([gemini_key, firecrawl_key, serper_key]):
-    st.error("Missing API keys in Streamlit Secrets. Please check your .streamlit/secrets.toml or Streamlit Cloud settings.")
+    st.error("Missing API keys. Please check your Streamlit Secrets.")
     st.stop()
 
 # Initialize SDKs
-# Note: Ensure you have firecrawl-py and google-genai installed
 firecrawl = Firecrawl(api_key=firecrawl_key)
 client = genai.Client(api_key=gemini_key, http_options={'api_version': 'v1beta'})
 
 # --- 2. FORMATTING HELPER ---
 def markdown_to_safe_html(text):
     """
-    Converts markdown to standard, semantic HTML.
-    Google Docs 'Create a Document' module requires clean tags to render correctly.
+    Converts markdown to standard, semantic HTML for Email and Google Docs.
     """
     # 1. Headers: ### Title -> <h3>Title</h3>
     text = re.sub(r'### (.*?)\n', r'<h3>\1</h3>', text)
-    
     # 2. Bold: **Text** -> <b>Text</b>
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    
-    # 3. Lists: * Item -> <li>Item</li> 
-    # (Note: Google Docs renders <li> best when wrapped in <ul>)
+    # 3. Lists: * Item -> <li>Item</li>
     text = re.sub(r'\* (.*?)\n', r'<li>\1</li>', text)
-    
-    # 4. Newlines: Google Docs HTML module prefers <p> for spacing
-    text = text.replace('\n', '<p></p>')
-    
-    # 5. The "Secret Sauce": Wrap the entire thing in <html><body> tags.
-    # This tells the Make.com module: "This is a full document, not just text."
+    # 4. Newlines: Standard breaks
+    text = text.replace('\n', '<br>')
+    # 5. Wrap in body for Google Doc rendering
     return f"<html><body>{text}</body></html>"
 
 # --- 3. STATE MANAGEMENT ---
@@ -57,13 +49,12 @@ if "report_content" not in st.session_state:
 
 # --- 4. UI LAYOUT ---
 st.title("🔍 AI SEO Content Gap Finder")
-st.caption("Compare your site against top-ranking competitors in seconds.")
+st.caption("Identify exactly why your competitors are outranking you.")
 
 with st.sidebar:
     st.header("Project Settings")
     user_url = st.text_input("Your Website URL", placeholder="https://mywebsite.com")
-    target_keyword = st.text_input("Target Keyword", placeholder="luxury watches")
-    
+    target_keyword = st.text_input("Target Keyword", placeholder="e.g., luxury smartphones")
     st.divider()
     run_btn = st.button("🚀 Run AI Analysis", use_container_width=True)
 
@@ -73,66 +64,47 @@ if run_btn:
         st.warning("Please provide both your URL and a target keyword.")
     else:
         try:
-            # STEP 1: Find Competitor via Serper.dev
-            with st.spinner("🕵️ Finding the top-ranking competitor..."):
+            # STEP 1: Find Competitor
+            with st.spinner("🕵️ Searching for top-ranking competitor..."):
                 headers = {'X-API-KEY': serper_key, 'Content-Type': 'application/json'}
-                search_res = requests.post(
-                    'https://google.serper.dev/search', 
-                    json={"q": target_keyword, "num": 1}, 
-                    headers=headers
-                )
-                search_data = search_res.json()
-                
-                if 'organic' not in search_data or not search_data['organic']:
-                    st.error("No search results found for that keyword.")
-                    st.stop()
-                
-                comp_url = search_data['organic'][0]['link'].split('?')[0]
+                search_res = requests.post('https://google.serper.dev/search', 
+                                         json={"q": target_keyword, "num": 1}, headers=headers)
+                comp_url = search_res.json()['organic'][0]['link'].split('?')[0]
                 st.session_state.current_comp = comp_url
 
-            # STEP 2: Scrape Content via Firecrawl
+            # STEP 2: Scrape Content
             with st.spinner(f"📄 Scraping {user_url} and {comp_url}..."):
-                # Using the latest .scrape() syntax
                 user_scrape = firecrawl.scrape(user_url, formats=['markdown'])
                 comp_scrape = firecrawl.scrape(comp_url, formats=['markdown'])
-                
                 u_md = getattr(user_scrape, 'markdown', "")[:8000]
                 c_md = getattr(comp_scrape, 'markdown', "")[:8000]
 
-            # STEP 3: Generate Analysis via Gemini (with Retry Logic)
+            # STEP 3: Gemini Analysis (with 503 Retry)
             with st.spinner("♊ AI is analyzing content gaps..."):
                 prompt = f"""
-                You are a Senior SEO Specialist. Compare the following two websites for the keyword: '{target_keyword}'.
-                
-                Our Site Content: {u_md}
-                Competitor Site Content: {c_md}
-                
-                Provide:
-                1. A brief strategic context.
-                2. Three specific content gaps the competitor covers that we don't.
-                3. A 4-step execution plan to outrank them.
-                
-                Use Markdown formatting. Be specific and technical.
+                You are a Senior SEO Specialist. Compare {user_url} vs {comp_url} for '{target_keyword}'.
+                Output three sections separated by '---':
+                1. Strategic Context
+                ---
+                2. Three Specific Content Gaps
+                ---
+                3. A 4-Step Execution Plan to Outrank Them
                 """
                 
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
-                        response = client.models.generate_content(
-                            model='gemini-3-flash-preview', 
-                            contents=prompt
-                        )
+                        response = client.models.generate_content(model='gemini-3-flash-preview', contents=prompt)
                         st.session_state.report_content = response.text
                         st.session_state.report_ready = True
                         st.session_state.current_url = user_url
                         st.session_state.current_keyword = target_keyword
                         break 
-                    except Exception as gemini_err:
-                        if "503" in str(gemini_err) and attempt < max_retries - 1:
+                    except Exception as e:
+                        if "503" in str(e) and attempt < max_retries - 1:
                             time.sleep((attempt + 1) * 2)
                             continue
-                        else:
-                            raise gemini_err
+                        else: raise e
 
         except Exception as e:
             st.error(f"Analysis failed: {e}")
@@ -140,50 +112,42 @@ if run_btn:
 # --- 6. DISPLAY & LEAD CAPTURE ---
 if st.session_state.report_ready:
     st.divider()
-    st.subheader(f"📊 Content Gap Report: {st.session_state.current_url}")
-    st.markdown(st.session_state.report_content)
+    st.subheader(f"📊 Preview Report: {st.session_state.current_url}")
+    # Show only the first two sections as a 'tease' on screen
+    tease_view = "---".join(st.session_state.report_content.split("---")[:2])
+    st.markdown(tease_view)
     
+    st.info("💡 The full 4-Step Execution Plan is available via the PDF report below.")
+
     st.divider()
-    # The Lead Capture Form
     with st.form("lead_capture_form", clear_on_submit=True):
-        st.subheader("📬 Email This Report as a PDF")
-        email_input = st.text_input("Enter your email address")
-        submit_lead = st.form_submit_button("Send Full PDF Strategy")
+        st.subheader("📬 Send Full Blueprint to My Inbox")
+        email_input = st.text_input("Email Address")
+        submit_lead = st.form_submit_button("Get the Full Strategy (PDF)")
         
         if submit_lead:
             if "@" not in email_input:
-                st.error("Invalid email.")
+                st.error("Invalid email address.")
             else:
-                # 1. SPLIT THE CONTENT
-                # We assume Gemini uses '---' to separate sections
+                # 1. Tease & Reveal Logic
                 parts = st.session_state.report_content.split("---")
+                email_body = parts[0] + (parts[1] if len(parts) > 1 else "")
                 
-                # Tease: Strategic Context + Gaps
-                email_tease = parts[0] + (parts[1] if len(parts) > 1 else "")
-                # Full: Everything
-                full_blueprint = st.session_state.report_content
-        
-                # 2. PREP PAYLOAD
+                # 2. Prep Payload
                 payload = {
-                    "email": email_input,
+                    "email": email_input, 
+                    "url": st.session_state.current_url, 
                     "keyword": st.session_state.current_keyword,
-                    "url": st.session_state.current_url,
-                    "email_body": markdown_to_safe_html(email_tease),
-                    "pdf_body": markdown_to_safe_html(full_blueprint)
+                    "email_content": markdown_to_safe_html(email_body),
+                    "pdf_content": markdown_to_safe_html(st.session_state.report_content)
                 }
-        # 3. SEND TO MAKE
-        requests.post(WEBHOOK_URL, json=payload)
-        st.success("The teaser is in your inbox; the full blueprint is attached!")
-            try:
-                # Final safety check on URL
-                if not WEBHOOK_URL.startswith("http"):
-                    st.error("Invalid Webhook URL. Please check your script configuration.")
-                else:
-                    response = requests.post(WEBHOOK_URL, json=payload)
-                    if response.status_code == 200:
+                
+                try:
+                    res = requests.post(WEBHOOK_URL, json=payload)
+                    if res.status_code == 200:
                         st.balloons()
-                        st.success(f"Success! The PDF is being generated and sent to {email_input}")
+                        st.success(f"Success! Teaser sent to {email_input}. Full PDF attached.")
                     else:
-                        st.error(f"Delivery Service Error (Make.com): {response.status_code}")
-            except Exception as e:
-                st.error(f"Could not connect to Delivery Service: {e}")
+                        st.error(f"Make.com Error: {res.status_code}")
+                except Exception as e:
+                    st.error(f"Connection error: {e}")
