@@ -1,15 +1,15 @@
 import streamlit as st
+import requests
+import os
 from firecrawl import FirecrawlApp
 from langchain_anthropic import ChatAnthropic
-import os
 
 # 1. Setup Page Config
 st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
 st.title("🔍 SEO Content Gap Finder")
 st.write("Enter your URL and a keyword to find exactly what your competitors are doing better.")
 
-# 2. Get API Keys (From Streamlit Secrets or Local .env)
-# When deployed, it looks in "Secrets". Locally, it looks for environment variables.
+# 2. Get API Keys
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
 
@@ -21,7 +21,13 @@ if not anthropic_key or not firecrawl_key:
 firecrawl = FirecrawlApp(api_key=firecrawl_key)
 model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
 
-# 4. The UI Form
+# Initialize session state to keep the report visible after lead capture
+if "report_ready" not in st.session_state:
+    st.session_state.report_ready = False
+if "report_content" not in st.session_state:
+    st.session_state.report_content = ""
+
+# 4. The Main Audit Form
 with st.form("audit_form"):
     user_url = st.text_input("Your Website URL", placeholder="https://mywebsite.com")
     target_keyword = st.text_input("Target Keyword", placeholder="best wireless headphones")
@@ -57,9 +63,48 @@ if submit:
                 
                 response = model.invoke(prompt)
                 
-                st.success("Analysis Complete!")
-                st.markdown("### 📊 The Gap Report")
-                st.write(response.content)
+                # Save to session state
+                st.session_state.report_content = response.content
+                st.session_state.report_ready = True
+                st.session_state.current_url = user_url
+                st.session_state.current_keyword = target_keyword
                 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+# 5. Display Report and Lead Capture
+if st.session_state.report_ready:
+    st.success("Analysis Complete!")
+    st.markdown("### 📊 The Gap Report")
+    st.write(st.session_state.report_content)
+    
+    st.markdown("---")
+    st.subheader("📬 Want the Full 10-Page Content Blueprint?")
+    st.write("The AI has identified the gaps. Enter your email to receive the complete step-by-step execution plan in your inbox.")
+    
+    # Lead Capture Form
+    with st.form("lead_capture"):
+        email = st.text_input("Email Address")
+        lead_submit = st.form_submit_button("Send Me the Full Report")
+        
+        if lead_submit:
+            if "@" in email and "." in email:
+                webhook_url = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia"
+                payload = {
+                    "email": email,
+                    "url": st.session_state.current_url,
+                    "keyword": st.session_state.current_keyword,
+                    "summary": st.session_state.report_content[:1000] # Sending summary to Make
+                }
+                
+                try:
+                    res = requests.post(webhook_url, json=payload)
+                    if res.status_code == 200:
+                        st.balloons()
+                        st.success("Success! Your full report is being generated and will arrive in your inbox shortly.")
+                    else:
+                        st.error("Connection error. Please try again later.")
+                except Exception as e:
+                    st.error(f"Failed to send lead: {e}")
+            else:
+                st.error("Please enter a valid email address.")
