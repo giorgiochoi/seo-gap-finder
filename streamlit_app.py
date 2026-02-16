@@ -1,24 +1,23 @@
 import streamlit as st
 import requests
 import os
-from firecrawl import FirecrawlApp  # Updated for SDK v2.0+
+from firecrawl import Firecrawl # Updated to v2.0+
 from langchain_anthropic import ChatAnthropic
 
-# --- 1. SETUP & CONFIG ---
-st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍", layout="wide")
+# --- 1. SETUP ---
+st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
+st.title("🔍 SEO Content Gap Finder")
 
-# Fetch keys from Streamlit Secrets
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY")
 serper_key = st.secrets.get("SERPER_API_KEY")
 
 if not all([anthropic_key, firecrawl_key, serper_key]):
-    st.error("Missing API keys. Please check your Streamlit Secrets.")
+    st.error("Missing API keys in Streamlit Secrets.")
     st.stop()
 
-# Initialize SDKs
-# Note: FirecrawlApp is the modern standard for the v2 SDK
-firecrawl = FirecrawlApp(api_key=firecrawl_key)
+# Initialize v2.0 SDK
+firecrawl = Firecrawl(api_key=firecrawl_key)
 model = ChatAnthropic(model="claude-3-5-sonnet-20240620", api_key=anthropic_key)
 
 # --- 2. STATE MANAGEMENT ---
@@ -27,96 +26,54 @@ if "report_ready" not in st.session_state:
 if "report_content" not in st.session_state:
     st.session_state.report_content = ""
 
-# --- 3. UI LAYOUT ---
-st.title("🔍 SEO Content Gap Finder")
-st.markdown("Enter your URL and a keyword to find exactly what your top competitor is outranking you on.")
-
-with st.sidebar:
-    st.header("Project Settings")
+# --- 3. AUDIT FORM ---
+with st.form("audit_form"):
     user_url = st.text_input("Your Website URL", placeholder="https://mywebsite.com")
     target_keyword = st.text_input("Target Keyword", placeholder="best wireless headphones")
-    run_btn = st.button("Run AI Analysis", use_container_width=True)
+    submit = st.form_submit_button("Run Analysis")
 
-# --- 4. CORE LOGIC ---
-if run_btn:
-    if not user_url or not target_keyword:
-        st.warning("Please provide both a URL and a keyword.")
-    else:
-        with st.spinner("🕵️ Searching for top competitor via Serper.dev..."):
-            try:
-                # STEP 1: Find Competitor via Serper
-                headers = {'X-API-KEY': serper_key, 'Content-Type': 'application/json'}
-                search_res = requests.post(
-                    'https://google.serper.dev/search', 
-                    json={"q": target_keyword, "num": 1}, 
-                    headers=headers
-                )
-                search_data = search_res.json()
+if submit:
+    with st.spinner("🕵️ Searching and Scraping..."):
+        try:
+            # Step 1: Search via Serper
+            headers = {'X-API-KEY': serper_key, 'Content-Type': 'application/json'}
+            search_res = requests.post('https://google.serper.dev/search', json={"q": target_keyword, "num": 1}, headers=headers)
+            search_json = search_res.json()
+            
+            if 'organic' not in search_json or not search_json['organic']:
+                st.error("No search results found for that keyword.")
+                st.stop()
                 
-                if 'organic' not in search_data or not search_data['organic']:
-                    st.error("No search results found. Check your Serper API key or keyword.")
-                    st.stop()
-                
-                # Clean the competitor URL
-                comp_url = search_data['organic'][0]['link'].split('?')[0]
-                st.info(f"Targeting Competitor: {comp_url}")
+            comp_url = search_json['organic'][0]['link']
+            st.write(f"Analyzing vs. **{comp_url}**")
 
-                # STEP 2: Scrape both sites (Updated for SDK v2.0+ parameters)
-                with st.spinner("📄 Scraping content..."):
-                    # In v2.0+, parameters like 'formats' are passed directly, NOT inside a 'params' dict
-                    user_scrape = firecrawl.scrape_url(user_url, formats=['markdown'])
-                    comp_scrape = firecrawl.scrape_url(comp_url, formats=['markdown'])
-                    
-                    # Extract markdown safely from the response object/dict
-                    user_markdown = user_scrape.get('markdown', '') if isinstance(user_scrape, dict) else getattr(user_scrape, 'markdown', '')
-                    comp_markdown = comp_scrape.get('markdown', '') if isinstance(comp_scrape, dict) else getattr(comp_scrape, 'markdown', '')
+            # Step 2: Scrape (Updated v2.0 Method)
+            user_data = firecrawl.scrape(user_url, formats=['markdown'])
+            comp_data = firecrawl.scrape(comp_url, formats=['markdown'])
+            
+            # Step 3: AI Analysis
+            # Safety: Limit markdown to 6000 chars to avoid token limits
+            u_md = user_data.get('markdown', '')[:6000]
+            c_md = comp_data.get('markdown', '')[:6000]
+            
+            prompt = f"Compare {user_url} vs {comp_url} for '{target_keyword}'. Provide 3 missed sub-topics and a 200-word execution plan. USER: {u_md} COMP: {c_md}"
+            response = model.invoke(prompt)
+            
+            st.session_state.report_content = response.content
+            st.session_state.report_ready = True
+            st.session_state.current_url = user_url
+            st.session_state.current_keyword = target_keyword
+        except Exception as e:
+            st.error(f"Error: {e}")
 
-                # STEP 3: AI Gap Analysis
-                if not user_markdown or not comp_markdown:
-                    st.error("Could not extract enough content. The site might be blocking the scraper.")
-                    st.stop()
-
-                with st.spinner("🤖 Claude is analyzing the gap..."):
-                    prompt = (
-                        f"Compare the content of {user_url} against the top-ranking competitor {comp_url} "
-                        f"for the keyword '{target_keyword}'. \n\n"
-                        f"USER SITE CONTENT: {user_markdown[:8000]}\n\n"
-                        f"COMPETITOR CONTENT: {comp_markdown[:8000]}\n\n"
-                        "Provide a professional 'Content Gap Report'. List 3 specific sub-topics the competitor covers "
-                        "that the user is missing, and provide a 200-word execution plan to outrank them."
-                    )
-                    response = model.invoke(prompt)
-                    
-                    st.session_state.report_content = response.content
-                    st.session_state.report_ready = True
-                    st.session_state.current_url = user_url
-                    st.session_state.current_keyword = target_keyword
-                    
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-
-# --- 5. DISPLAY & LEAD CAPTURE ---
+# --- 4. DISPLAY & LEAD CAPTURE ---
 if st.session_state.report_ready:
-    st.divider()
-    st.subheader("📊 The Gap Report")
-    st.markdown(st.session_state.report_content)
-    
-    st.divider()
-    st.subheader("📬 Get the Full 10-Page Strategy")
+    st.markdown("### 📊 The Gap Report")
+    st.write(st.session_state.report_content)
     with st.form("lead_capture"):
         email = st.text_input("Email Address")
-        submit_lead = st.form_submit_button("Send Me the Full Report")
-        
-        if submit_lead:
-            if "@" not in email:
-                st.error("Please enter a valid email.")
-            else:
-                webhook_url = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia"
-                payload = {
-                    "email": email, 
-                    "url": st.session_state.current_url, 
-                    "keyword": st.session_state.current_keyword
-                }
-                requests.post(webhook_url, json=payload)
-                st.balloons()
-                st.success("Success! Check your inbox soon.")
+        if st.form_submit_button("Send Me the Full Report"):
+            webhook_url = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia"
+            requests.post(webhook_url, json={"email": email, "url": st.session_state.current_url, "keyword": st.session_state.current_keyword})
+            st.balloons()
+            st.success("Sent!")
