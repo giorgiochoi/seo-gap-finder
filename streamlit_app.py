@@ -12,7 +12,7 @@ gemini_key = st.secrets.get("GEMINI_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY")
 serper_key = st.secrets.get("SERPER_API_KEY")
 # PASTE YOUR WEBHOOK URL HERE
-WEBHOOK_URL = "https://hook.us2.make.com/abc123xyz" 
+WEBHOOK_URL = "https://hook.us2.make.com/i4ntiyak1rrawyvbfvrbe1y73vgg44ia" 
 
 if not all([gemini_key, firecrawl_key, serper_key]):
     st.error("Missing API keys in Streamlit Secrets.")
