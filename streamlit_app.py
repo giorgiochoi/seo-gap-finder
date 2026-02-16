@@ -9,6 +9,7 @@ st.set_page_config(page_title="AI SEO Gap Finder", page_icon="🔍")
 st.title("🔍 SEO Content Gap Finder")
 st.write("Enter your URL and a keyword to find exactly what your competitors are doing better.")
 st.write(f"Firecrawl Key loaded? {'Yes' if firecrawl_key and firecrawl_key.startswith('fc-') else 'No'}")
+
 # 2. Get API Keys
 anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 firecrawl_key = st.secrets.get("FIRECRAWL_API_KEY") or os.getenv("FIRECRAWL_API_KEY")
