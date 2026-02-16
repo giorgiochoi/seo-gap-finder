@@ -29,20 +29,25 @@ client = genai.Client(api_key=gemini_key, http_options={'api_version': 'v1beta'}
 # --- 2. FORMATTING HELPER ---
 def markdown_to_safe_html(text):
     """
-    Converts markdown to standard HTML tags that Google Docs 
-    and Email clients both understand easily.
+    Converts markdown to standard, semantic HTML.
+    Google Docs 'Create a Document' module requires clean tags to render correctly.
     """
-    # 1. Handle Headers (### Header) -> <h3>Header</h3>
+    # 1. Headers: ### Title -> <h3>Title</h3>
     text = re.sub(r'### (.*?)\n', r'<h3>\1</h3>', text)
-    # 2. Handle Bold (**Text**) -> <b>Text</b>
+    
+    # 2. Bold: **Text** -> <b>Text</b>
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
-    # 3. Handle Lists (* Item) -> <li>Item</li>
-    # We wrap them in <ul> for proper bullet formatting
-    text = re.sub(r'\* (.*?)\n', r'<ul><li>\1</li></ul>', text)
-    # 4. Convert newlines to standard paragraph breaks
+    
+    # 3. Lists: * Item -> <li>Item</li> 
+    # (Note: Google Docs renders <li> best when wrapped in <ul>)
+    text = re.sub(r'\* (.*?)\n', r'<li>\1</li>', text)
+    
+    # 4. Newlines: Google Docs HTML module prefers <p> for spacing
     text = text.replace('\n', '<p></p>')
     
-    return text
+    # 5. The "Secret Sauce": Wrap the entire thing in <html><body> tags.
+    # This tells the Make.com module: "This is a full document, not just text."
+    return f"<html><body>{text}</body></html>"
 
 # --- 3. STATE MANAGEMENT ---
 if "report_ready" not in st.session_state:
