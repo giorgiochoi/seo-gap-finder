@@ -1,4 +1,4 @@
 streamlit
-firecrawl-py>=1.0.0
+requests
+firecrawl-py
 langchain-anthropic
-python-dotenv
