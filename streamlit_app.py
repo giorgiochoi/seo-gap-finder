@@ -16,7 +16,10 @@ if not all([gemini_key, firecrawl_key, serper_key]):
 
 # Initialize SDKs with API version fix
 firecrawl = Firecrawl(api_key=firecrawl_key)
-client = genai.Client(api_key=gemini_key, http_options={'api_version': 'v1'})
+client = genai.Client(
+    api_key=gemini_key, 
+    http_options={'api_version': 'v1beta'} 
+)
 
 if "report_ready" not in st.session_state:
     st.session_state.report_ready = False
@@ -32,26 +35,23 @@ with st.sidebar:
     run_btn = st.button("Run Analysis", use_container_width=True)
 
 # --- 4. CORE LOGIC ---
-with st.spinner("♊ Gemini is analyzing..."):
-    # Try the most stable 2026 models in order
-    available_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
-    success = False
-    
-    for model_id in available_models:
-        try:
-            response = client.models.generate_content(
-                model=model_id,
-                contents=prompt
-            )
-            st.session_state.report_content = response.text
-            st.session_state.report_ready = True
-            success = True
-            break # Stop if we get a response
-        except Exception as e:
-            continue # Try the next model if this one 404s
-            
-    if not success:
-        st.error("All Gemini models returned a 404. Please check if the 'Generative Language API' is enabled in your Google Cloud Console.")
+with st.spinner("♊ Gemini 3 is analyzing..."):
+    # gemini-3-flash-preview is the most powerful free-tier model available today
+    try:
+        response = client.models.generate_content(
+            model='gemini-3-flash-preview',
+            contents=prompt
+        )
+        st.session_state.report_content = response.text
+        st.session_state.report_ready = True
+    except Exception as e:
+        # Fallback to the stable 2.5 if preview is hitting rate limits
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', 
+            contents=prompt
+        )
+        st.session_state.report_content = response.text
+        st.session_state.report_ready = True
 # --- 5. DISPLAY ---
 if st.session_state.report_ready:
     st.divider()
